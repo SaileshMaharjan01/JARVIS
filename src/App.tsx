@@ -63,6 +63,11 @@ export default function App() {
       rec.onerror = (event: any) => {
         addLog(`[MALFUNCTION] Vocal capture error: ${event.error}`);
         setState(JarvisState.IDLE);
+        if (event.error === "not-allowed") {
+          setMicWarning(
+            "Microphone access blocked or restricted! If you are viewing the app in the AI Studio preview pane, your browser restricts microphone voice recognition inside sandboxed frames. Please open the app in a 'New Tab' using the button at the bottom right to grant permission directly, or use the manual text console below."
+          );
+        }
       };
 
       rec.onend = () => {
@@ -170,39 +175,41 @@ export default function App() {
       synthRef.current.cancel();
     }
 
-    // Force prompt microphone hardware permissions explicitly in browser
-    try {
-      addLog("[SYSTEM_SYS] Querying hardware sensory microphone permissions...");
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Release stream tracks immediately so it does not hold the mic locked
-        stream.getTracks().forEach((track) => track.stop());
-        addLog("[SYSTEM_SYS] Hardware sensory grid access: GRANTED.");
-      }
-    } catch (err: any) {
-      addLog(`[MALFUNCTION] Hardware access permission denied: ${err.message}`);
-      setMicWarning(
-        "Microphone access was denied or is blocked in this container sandbox. Please click 'Open New Tab' at the bottom to grant permissions directly, or use Manual Transmit."
-      );
-      return;
-    }
-
     if (!recognitionRef.current) {
-      addLog("[MALFUNCTION] Unable to initiate vocal capture. Browser permissions required.");
+      addLog("[MALFUNCTION] Speech recognition is unsupported or restricted in this browser environment.");
       setMicWarning(
-        "Vocal speech recognition is not supported or was blocked on this browser configuration. Please click 'Open New Tab' at the bottom to grant microphone access, or use the Manual Prompt textbox."
+        "Vocal speech recognition is not supported or was blocked on this browser configuration. Please click 'Open New Tab' at the bottom to grant microphone access, or use the manual text console below."
       );
       return;
     }
 
     try {
+      addLog("[SYSTEM_SYS] Triggering voice capturer...");
       recognitionRef.current.start();
     } catch (err: any) {
       if (err.name === "InvalidStateError") {
-        // Speech recognition is already running
+        // Speech recognition is already running, toggle it off to restart clean
         addLog("[SYSTEM_SYS] Recalibrating active vocal listening stream.");
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
       } else {
-        addLog(`[MALFUNCTION] Speech initiation error: ${err.message}`);
+        addLog(`[MALFUNCTION] Web Speech start error: ${err.message}`);
+        
+        // Secondary fallback: explicitly query microphone permissions
+        try {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            addLog("[SYSTEM_SYS] Requesting primary media stream access as fallback...");
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach((track) => track.stop());
+            recognitionRef.current.start();
+          }
+        } catch (mediaErr: any) {
+          addLog(`[MALFUNCTION] Hardware access permission denied: ${mediaErr.message}`);
+          setMicWarning(
+            "Microphone access was denied or is blocked in this container sandbox. Please click 'Open New Tab' at the bottom to grant permissions directly, or type your query in the manual text box."
+          );
+        }
       }
     }
   };
