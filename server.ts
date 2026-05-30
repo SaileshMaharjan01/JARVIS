@@ -1,8 +1,8 @@
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -15,20 +15,24 @@ async function startServer() {
   // Verify API Key existence
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn("WARNING: GEMINI_API_KEY environment variable is not set. Please configure it in Settings > Secrets.");
+    console.warn(
+      "WARNING: GEMINI_API_KEY environment variable is not set. Please configure it in Settings > Secrets.",
+    );
   }
 
   // Lazy-initialize Gemini client or guard it
   const getGeminiClient = () => {
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
-      throw new Error("GEMINI_API_KEY is not configured. Please add it via the Secrets panel in AI Studio.");
+      throw new Error(
+        "GEMINI_API_KEY is not configured. Please add it via the Secrets panel in AI Studio.",
+      );
     }
     return new GoogleGenAI({
       apiKey: key,
       httpOptions: {
         headers: {
-          'User-Agent': 'aistudio-build',
+          "User-Agent": "aistudio-build",
         },
       },
     });
@@ -83,11 +87,19 @@ Answer the user's input with this exact persona.`;
         },
       });
 
-      const replyText = response.text || "I am currently offline, Sir. Let me attempt to establish communications again.";
+      const replyText =
+        response.text ||
+        "I am currently offline, Sir. Let me attempt to establish communications again.";
       res.json({ text: replyText });
     } catch (error: any) {
       console.error("Gemini API Error:", error);
-      res.status(500).json({ error: error.message || "Apologies Sir, I encountered an internal cognitive malfunction." });
+      res
+        .status(500)
+        .json({
+          error:
+            error.message ||
+            "Apologies Sir, I encountered an internal cognitive malfunction.",
+        });
     }
   });
 
@@ -99,10 +111,10 @@ Answer the user's input with this exact persona.`;
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 

@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { JarvisState, ChatMessage } from "./types";
-import { HeaderHUD } from "./components/HeaderHUD";
-import { JarvisCore } from "./components/JarvisCore";
+import { AlertCircle, Mic, MicOff, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { AcousticWave } from "./components/AcousticWave";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
+import { HeaderHUD } from "./components/HeaderHUD";
+import { JarvisCore } from "./components/JarvisCore";
 import { TextTerminal } from "./components/TextTerminal";
-import { Mic, MicOff, AlertCircle, HelpCircle, Power, Volume2 } from "lucide-react";
+import { ChatMessage, JarvisState } from "./types";
 
 export default function App() {
   const [state, setState] = useState<JarvisState>(JarvisState.IDLE);
@@ -36,12 +36,15 @@ export default function App() {
       synthRef.current = window.speechSynthesis;
       addLog("[SYSTEM_SYS] Audio synthesis engine connected successfully.");
     } else {
-      addLog("[MALFUNCTION] Audio synthesis is unsupported in this browser container.");
+      addLog(
+        "[MALFUNCTION] Audio synthesis is unsupported in this browser container.",
+      );
     }
 
     // Setup speech recognition
     const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       const rec = new SpeechRecognition();
@@ -65,7 +68,7 @@ export default function App() {
         setState(JarvisState.IDLE);
         if (event.error === "not-allowed") {
           setMicWarning(
-            "Microphone access blocked or restricted! If you are viewing the app in the AI Studio preview pane, your browser restricts microphone voice recognition inside sandboxed frames. Please open the app in a 'New Tab' using the button at the bottom right to grant permission directly, or use the manual text console below."
+            "Microphone access blocked or restricted! If you are viewing the app in the AI Studio preview pane, your browser restricts microphone voice recognition inside sandboxed frames. Please open the app in a 'New Tab' using the button at the bottom right to grant permission directly, or use the manual text console below.",
           );
         }
       };
@@ -73,20 +76,26 @@ export default function App() {
       rec.onend = () => {
         addLog("[SYSTEM_SYS] Audio transmission stream closed.");
         // Only return to IDLE if we didn't update to THINKING first on success
-        setState((current) => (current === JarvisState.LISTENING ? JarvisState.IDLE : current));
+        setState((current) =>
+          current === JarvisState.LISTENING ? JarvisState.IDLE : current,
+        );
       };
 
       recognitionRef.current = rec;
     } else {
       setIsSpeechSupported(false);
-      addLog("[SYSTEM_SYS] Speech recognition not supported or blocked in iframe sandbox.");
+      addLog(
+        "[SYSTEM_SYS] Speech recognition not supported or blocked in iframe sandbox.",
+      );
     }
 
     addLog("[SYSTEM_SYS] J.A.R.V.I.S. mainframe initially active. Ready, Sir.");
 
     // Greet the user automatically on start after a tiny timeout
     const welcomeTimer = setTimeout(() => {
-      speakText("At your service, Sir. J.A.R.V.I.S. is fully initialised. What diagnostics or queries shall we address today?");
+      speakText(
+        "At your service, Sir. J.A.R.V.I.S. is fully initialised. What diagnostics or queries shall we address today?",
+      );
       // Add first assistant message
       setMessages([
         {
@@ -94,7 +103,7 @@ export default function App() {
           role: "assistant",
           text: "At your service, Sir. J.A.R.V.I.S. is fully initialised. What diagnostics or queries shall we address today?",
           timestamp: new Date().toLocaleTimeString("en-US", { hour12: false }),
-        }
+        },
       ]);
     }, 1200);
 
@@ -126,15 +135,27 @@ export default function App() {
 
     if (voiceAccent === "UK Male") {
       selectedVoice =
-        voices.find((v) => v.lang.includes("en-GB") && v.name.toLowerCase().includes("male")) ||
+        voices.find(
+          (v) =>
+            v.lang.includes("en-GB") && v.name.toLowerCase().includes("male"),
+        ) ||
         voices.find((v) => v.lang.includes("en-GB")) ||
-        voices.find((v) => v.lang.includes("en-IN") && v.name.toLowerCase().includes("male")) ||
-        voices.find((v) => v.lang.includes("en-US") && v.name.toLowerCase().includes("male")) ||
+        voices.find(
+          (v) =>
+            v.lang.includes("en-IN") && v.name.toLowerCase().includes("male"),
+        ) ||
+        voices.find(
+          (v) =>
+            v.lang.includes("en-US") && v.name.toLowerCase().includes("male"),
+        ) ||
         voices[0];
     } else {
       // Custom generic clear voice
       selectedVoice =
-        voices.find((v) => v.lang.includes("en-US") && v.name.toLowerCase().includes("male")) ||
+        voices.find(
+          (v) =>
+            v.lang.includes("en-US") && v.name.toLowerCase().includes("male"),
+        ) ||
         voices.find((v) => v.lang.includes("en")) ||
         voices[0];
     }
@@ -175,10 +196,33 @@ export default function App() {
       synthRef.current.cancel();
     }
 
-    if (!recognitionRef.current) {
-      addLog("[MALFUNCTION] Speech recognition is unsupported or restricted in this browser environment.");
+    // Force prompt microphone hardware permissions explicitly in browser
+    try {
+      addLog(
+        "[SYSTEM_SYS] Querying hardware sensory microphone permissions...",
+      );
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        // Release stream tracks immediately so it does not hold the mic locked
+        stream.getTracks().forEach((track) => track.stop());
+        addLog("[SYSTEM_SYS] Hardware sensory grid access: GRANTED.");
+      }
+    } catch (err: any) {
+      addLog(`[MALFUNCTION] Hardware access permission denied: ${err.message}`);
       setMicWarning(
-        "Vocal speech recognition is not supported or was blocked on this browser configuration. Please click 'Open New Tab' at the bottom to grant microphone access, or use the manual text console below."
+        "Microphone access was denied or is blocked in this container sandbox. Please click 'Open New Tab' at the bottom to grant permissions directly, or use Manual Transmit.",
+      );
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      addLog(
+        "[MALFUNCTION] Unable to initiate vocal capture. Browser permissions required.",
+      );
+      setMicWarning(
+        "Vocal speech recognition is not supported or was blocked on this browser configuration. Please click 'Open New Tab' at the bottom to grant microphone access, or use the Manual Prompt textbox.",
       );
       return;
     }
@@ -195,19 +239,25 @@ export default function App() {
         } catch (e) {}
       } else {
         addLog(`[MALFUNCTION] Web Speech start error: ${err.message}`);
-        
+
         // Secondary fallback: explicitly query microphone permissions
         try {
           if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            addLog("[SYSTEM_SYS] Requesting primary media stream access as fallback...");
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            addLog(
+              "[SYSTEM_SYS] Requesting primary media stream access as fallback...",
+            );
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+            });
             stream.getTracks().forEach((track) => track.stop());
             recognitionRef.current.start();
           }
         } catch (mediaErr: any) {
-          addLog(`[MALFUNCTION] Hardware access permission denied: ${mediaErr.message}`);
+          addLog(
+            `[MALFUNCTION] Hardware access permission denied: ${mediaErr.message}`,
+          );
           setMicWarning(
-            "Microphone access was denied or is blocked in this container sandbox. Please click 'Open New Tab' at the bottom to grant permissions directly, or type your query in the manual text box."
+            "Microphone access was denied or is blocked in this container sandbox. Please click 'Open New Tab' at the bottom to grant permissions directly, or type your query in the manual text box.",
           );
         }
       }
@@ -291,7 +341,9 @@ export default function App() {
     if (!isMuted && synthRef.current) {
       synthRef.current.cancel();
     }
-    addLog(`[SYSTEM_SYS] Speech playback toggled to: ${!isMuted ? "MUTED" : "UNMUTED"}`);
+    addLog(
+      `[SYSTEM_SYS] Speech playback toggled to: ${!isMuted ? "MUTED" : "UNMUTED"}`,
+    );
   };
 
   const clearLogs = () => {
@@ -306,18 +358,18 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-cyan-400 flex flex-col font-sans scanlines relative overflow-hidden">
+    <div className="min-h-screen bg-hud-bg text-cyan-400 flex flex-col font-sans scanlines relative overflow-hidden">
       {/* Background HUD Elements */}
       <div className="absolute inset-x-0 inset-y-0 pointer-events-none opacity-20 z-0 select-none">
         <div className="absolute top-10 left-10 w-48 h-48 border-t-2 border-l-2 border-cyan-500/30"></div>
         <div className="absolute bottom-10 right-10 w-48 h-48 border-b-2 border-r-2 border-cyan-500/30"></div>
-        <div className="absolute top-1/2 left-0 w-full h-[1px] bg-cyan-900/30"></div>
-        <div className="absolute top-0 left-1/2 w-[1px] h-full bg-cyan-900/30"></div>
+        <div className="absolute top-1/2 left-0 w-full h-px bg-cyan-900/30"></div>
+        <div className="absolute top-0 left-1/2 w-px h-full bg-cyan-900/30"></div>
       </div>
 
       {/* Atmospheric Glow circles */}
-      <div className="absolute w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none top-1/2 left-1/4 -translate-y-1/2 select-none z-0" />
-      <div className="absolute w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none bottom-10 right-1/4 select-none z-0" />
+      <div className="absolute w-125 h-125 bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none top-1/2 left-1/4 -translate-y-1/2 select-none z-0" />
+      <div className="absolute w-100 h-100 bg-blue-500/5 rounded-full blur-[100px] pointer-events-none bottom-10 right-1/4 select-none z-0" />
 
       {/* UI Corner Accents from mockup */}
       <div className="absolute top-0 left-0 w-24 h-24 border-t border-l border-cyan-500/40 pointer-events-none z-10" />
@@ -326,23 +378,23 @@ export default function App() {
       <div className="absolute bottom-0 right-0 w-24 h-24 border-b border-r border-cyan-500/40 pointer-events-none z-10" />
 
       {/* Scrolling Data Streams */}
-      <div className="absolute right-6 top-1/3 -translate-y-1/2 flex flex-col gap-2 opacity-30 pointer-events-none hidden xl:flex z-0 select-none">
-        <div className="w-16 h-[2px] bg-cyan-700"></div>
-        <div className="w-12 h-[2px] bg-cyan-700"></div>
-        <div className="w-20 h-[2px] bg-cyan-400"></div>
-        <div className="w-8 h-[2px] bg-cyan-700"></div>
-        <div className="w-14 h-[2px] bg-cyan-700"></div>
+      <div className="absolute right-6 top-1/3 -translate-y-1/2 flex flex-col gap-2 opacity-30 pointer-events-none xl:flex z-0 select-none">
+        <div className="w-16 h-0.5 bg-cyan-700"></div>
+        <div className="w-12 h-0.5 bg-cyan-700"></div>
+        <div className="w-20 h-0.5 bg-cyan-400"></div>
+        <div className="w-8 h-0.5 bg-cyan-700"></div>
+        <div className="w-14 h-0.5 bg-cyan-700"></div>
       </div>
-      <div className="absolute left-6 top-2/3 -translate-y-1/2 flex flex-col gap-2 opacity-30 pointer-events-none hidden xl:flex z-0 select-none">
-        <div className="w-10 h-[2px] bg-cyan-700"></div>
-        <div className="w-24 h-[2px] bg-cyan-400"></div>
-        <div className="w-16 h-[2px] bg-cyan-700"></div>
-        <div className="w-6 h-[2px] bg-cyan-700"></div>
+      <div className="absolute left-6 top-2/3 -translate-y-1/2 flex flex-col gap-2 opacity-30 pointer-events-none xl:flex z-0 select-none">
+        <div className="w-10 h-0.5 bg-cyan-700"></div>
+        <div className="w-24 h-0.5 bg-cyan-400"></div>
+        <div className="w-16 h-0.5 bg-cyan-700"></div>
+        <div className="w-6 h-0.5 bg-cyan-700"></div>
       </div>
 
       {/* HUD background grid aesthetics */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#00f0ff03_1px,transparent_1px),linear-gradient(to_bottom,#00f0ff05_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-0 select-none" />
-      
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#00f0ff03_1px,transparent_1px),linear-gradient(to_bottom,#00f0ff05_1px,transparent_1px)] bg-size-[32px_32px] pointer-events-none z-0 select-none" />
+
       {/* Core Header */}
       <div className="z-10">
         <HeaderHUD
@@ -356,13 +408,12 @@ export default function App() {
       </div>
 
       {/* Main Grid Workspace */}
-      <main className="flex-1 max-w-[1400px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch overflow-hidden z-10">
-        
+      <main className="flex-1 max-w-350 w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch overflow-hidden z-10">
         {/* Left Section: Jarvis Hologram Core Viewport */}
         <section className="lg:col-span-5 flex flex-col gap-4">
-          <div className="flex-grow flex flex-col justify-center items-center rounded-lg border border-[#00f0ff]/10 bg-slate-950/45 p-6 relative overflow-hidden backdrop-blur-md min-h-[350px]">
+          <div className="grow flex flex-col justify-center items-center rounded-lg border border-hud-primary/10 bg-slate-950/45 p-6 relative overflow-hidden backdrop-blur-md min-h-87.5">
             {/* Ambient sci-fi details */}
-            <div className="absolute top-3 left-3 font-mono text-[8px] text-[#00f0ff]/30 tracking-widest uppercase">
+            <div className="absolute top-3 left-3 font-mono text-[8px] text-hud-primary/30 tracking-widest uppercase">
               COGNITIVE_INTERFACE_PLANE
             </div>
             <div className="absolute top-3 right-3 flex items-center gap-1.5 font-mono text-[8px] text-emerald-400">
@@ -371,17 +422,24 @@ export default function App() {
             </div>
 
             {/* Glowing morphing liquefying Jarvis core inside */}
-            <div className="w-full max-w-[320px] h-full max-h-[320px] flex items-center justify-center animate-hud-pulse relative py-4">
-              
+            <div className="w-full max-w-[320px] h-full max-h-80 flex items-center justify-center animate-hud-pulse relative py-4">
               {/* Floating Data Tags around Ring - Mockup style */}
-              <div className="absolute -left-12 top-6 border-r border-[#00f0ff]/40 pr-3 text-right hidden sm:block pointer-events-none select-none">
-                <div className="text-[8px] text-slate-500 tracking-[0.2em] font-mono uppercase">NEURAL SYNC</div>
-                <div className="text-[10px] text-cyan-400 font-mono font-bold">ACTIVE_VER_8.5</div>
+              <div className="absolute -left-12 top-6 border-r border-hud-primary/40 pr-3 text-right hidden sm:block pointer-events-none select-none">
+                <div className="text-[8px] text-slate-500 tracking-[0.2em] font-mono uppercase">
+                  NEURAL SYNC
+                </div>
+                <div className="text-[10px] text-cyan-400 font-mono font-bold">
+                  ACTIVE_VER_8.5
+                </div>
               </div>
 
-              <div className="absolute -right-12 bottom-6 border-l border-[#00f0ff]/40 pl-3 text-left hidden sm:block pointer-events-none select-none">
-                <div className="text-[8px] text-slate-500 tracking-[0.2em] font-mono uppercase">VOICE RECOG</div>
-                <div className="text-[10px] text-cyan-400 font-mono font-bold">AUTHORIZED_SIR</div>
+              <div className="absolute -right-12 bottom-6 border-l border-hud-primary/40 pl-3 text-left hidden sm:block pointer-events-none select-none">
+                <div className="text-[8px] text-slate-500 tracking-[0.2em] font-mono uppercase">
+                  VOICE RECOG
+                </div>
+                <div className="text-[10px] text-cyan-400 font-mono font-bold">
+                  AUTHORIZED_SIR
+                </div>
               </div>
 
               <JarvisCore state={state} isMuted={isMuted} />
@@ -392,45 +450,44 @@ export default function App() {
               <button
                 onClick={handleStartListening}
                 disabled={state === JarvisState.THINKING}
-                className={`relative flex items-center justify-center gap-2 px-6 py-3.5 rounded-full border font-display text-xs tracking-widest font-bold font-semibold uppercase cursor-pointer select-none overflow-hidden group transition-all duration-300 w-full max-w-xs ${
+                className={`relative flex items-center justify-center gap-2 px-6 py-3.5 rounded-full border font-display text-xs tracking-widest font-semibold uppercase cursor-pointer select-none overflow-hidden group transition-all duration-300 w-full max-w-xs ${
                   state === JarvisState.LISTENING
-                    ? "bg-[#ffaa00]/10 border-[#ffaa00] text-[#ffaa00]/90 shadow-[0_0_20px_rgba(255,170,0,0.25)] scale-[0.98]"
+                    ? "bg-hud-accent/10 border-hud-accent text-hud-accent/90 shadow-[0_0_20px_rgba(255,170,0,0.25)] scale-[0.98]"
                     : state === JarvisState.SPEAKING
-                      ? "bg-[#00f0ff]/15 border-[#00f0ff] text-white shadow-[0_0_25px_rgba(0,240,255,0.35)] animate-pulse"
+                      ? "bg-hud-primary/15 border-hud-primary text-white shadow-[0_0_25px_rgba(0,240,255,0.35)] animate-pulse"
                       : "bg-cyan-500/10 border-cyan-400 text-cyan-200 hover:bg-cyan-500/20 hover:border-cyan-300 hover:shadow-[0_0_20px_rgba(0,240,255,0.25)] active:scale-95"
                 }`}
               >
                 {/* Glowing moving highlights */}
-                <div className="absolute -inset-x-20 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#00f0ff]/40 to-transparent translate-y-[-1px] group-hover:animate-pulse" />
-                
+                <div className="absolute -inset-x-20 top-0 h-px bg-linear-to-r from-transparent via-hud-primary/40 to-transparent translate-y-px group-hover:animate-pulse" />
+
                 {state === JarvisState.LISTENING ? (
                   <>
-                    <MicOff className="w-4 h-4 animate-bounce text-[#ffaa00]" />
+                    <MicOff className="w-4 h-4 animate-bounce text-hud-accent" />
                     LISTENING FOR VOICE...
                   </>
                 ) : state === JarvisState.THINKING ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 border-[#ffaa00] border-t-transparent rounded-full animate-spin" />
+                    <span className="w-3.5 h-3.5 border-2 border-hud-accent border-t-transparent rounded-full animate-spin" />
                     DECODING COMMAND...
                   </>
                 ) : state === JarvisState.SPEAKING ? (
                   <>
-                    <Volume2 className="w-4 h-4 text-[#00f0ff]" />
+                    <Volume2 className="w-4 h-4 text-hud-primary" />
                     JARVIS TRANSMITTING
                   </>
                 ) : (
                   <>
-                    <Mic className="w-4 h-4 text-[#00f0ff] group-hover:scale-110 duration-200" />
+                    <Mic className="w-4 h-4 text-hud-primary group-hover:scale-110 duration-200" />
                     TAP TO START TALKING
                   </>
                 )}
               </button>
-              
-              <p className="font-mono text-[9px] text-[#00f0ff]/40 text-center tracking-wider max-w-xs pointer-events-none uppercase">
-                {state === JarvisState.LISTENING 
-                  ? "Speak into your system mic, click button to submit." 
-                  : "Activates standard voice speech translation grid."
-                }
+
+              <p className="font-mono text-[9px] text-hud-primary/40 text-center tracking-wider max-w-xs pointer-events-none uppercase">
+                {state === JarvisState.LISTENING
+                  ? "Speak into your system mic, click button to submit."
+                  : "Activates standard voice speech translation grid."}
               </p>
             </div>
           </div>
@@ -438,9 +495,8 @@ export default function App() {
 
         {/* Right Section: Bento Dashboard (Chat terminal feed + Live diagnostics logs) */}
         <section className="lg:col-span-7 flex flex-col gap-6">
-          
           {/* Top of Bento: Scrollable diagnostics console logs */}
-          <div className="flex-1 min-h-[300px]">
+          <div className="flex-1 min-h-75">
             <TextTerminal
               state={state}
               messages={messages}
@@ -454,9 +510,7 @@ export default function App() {
           <div className="h-shrink select-none">
             <DiagnosticsPanel state={state} logs={logs} />
           </div>
-
         </section>
-
       </main>
 
       {/* Futuristic bottom visualizer line waveform */}
@@ -469,7 +523,7 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="border border-red-500/40 bg-[#090e16] w-full max-w-md p-6 rounded-lg relative overflow-hidden shadow-[0_0_30px_rgba(239,68,68,0.15)]">
             {/* Top red warning line */}
-            <div className="absolute top-0 inset-x-0 h-[3px] bg-red-500 shadow-[0_0_10px_#ef4444]" />
+            <div className="absolute top-0 inset-x-0 h-0.75 bg-red-500 shadow-[0_0_10px_#ef4444]" />
             <div className="absolute top-3 left-3 font-mono text-[8px] text-red-400 font-bold tracking-widest">
               HARDWARE_INTERFACE_ALERT
             </div>
